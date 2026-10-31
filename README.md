@@ -84,13 +84,25 @@ into labeled blocks (Controller, Protection, Power, Connectors, STM32 Microproce
 STM32 Decoupling, USB-C, 12V→3.3V) rather than hierarchical sheets — the board is small enough that
 visual grouping is clearer.
 
+## PDN analysis
+
+DC voltage-drop check done with [`padne`](https://github.com/atx/padne) (built from source — needs
+`boost` dev headers for its CGAL dependency): under the STM32's estimated 50 mA load, the 3.3 V/GND
+plane shows at most **148 µV** of drop — the copper is far from the bottleneck at this current level.
+`!padne` directives live as plain text in the schematic, not the PCB. Full write-up (including the
+`REGULATOR`+`CURRENT` solver interaction that made the LDO need modeling as a plain ideal source
+instead) in the report.
+
+AC impedance-vs-frequency sweep (the actual question for a digital decoupling bank — DC drop is blind
+to capacitors entirely) is planned with [KiPI](https://github.com/drewsum/KiPI) — installed and
+loading the board, but the probe/sweep setup wasn't finished this session.
+
 ## Pending
 
 - Firmware: an I²C driver reading the LTC4215's ADIN/status/fault registers, verified by compiling
   cleanly against the STM32F411 HAL and a host-side unit test against synthetic register bytes — not
   by claiming it was tested on hardware that was never built.
-- A PDN (power distribution network) impedance-vs-frequency check of the 3.3 V rail, to confirm the
-  decoupling bank actually covers the relevant frequency range instead of just following convention.
+- The PDN AC sweep above.
 - A permanent fix for the crystal's pad 3/4 net assignment being wiped on every "Update PCB from
   Schematic" re-sync (PCB-only pad overrides don't survive a re-sync from a schematic that never knew
   about those pads).

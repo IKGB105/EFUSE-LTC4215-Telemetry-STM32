@@ -218,6 +218,53 @@ are not re-discovered from scratch next time.
 \end{itemize}
 
 % ======================================================================
+\section{PDN Analysis}
+\label{sec:pdn}
+
+A DC (steady-state) check of the 3.3\,V/GND distribution under the STM32's estimated
+\SI{50}{\milli\ampere} load, run with \texttt{padne} (github.com/atx/padne), a KiCad-native DC power
+delivery network solver. DC and AC answer different questions and neither substitutes for the other:
+DC voltage drop is pure $I\times R$ through copper and is blind to the decoupling capacitors (an ideal
+capacitor carries no steady current, so a DC solver cannot tell whether the decoupling bank is
+adequate); AC impedance-vs-frequency is what actually determines whether the PDN can supply a fast
+switching transient without the rail sagging. This section covers the DC result; the AC sweep is not
+yet done (Section~\ref{sec:pending}).
+
+\textbf{Setup:} \texttt{!padne} directives placed as plain text in the schematic (not the PCB --
+\texttt{padne} reads sources/loads from the schematic and copper geometry from the board): an ideal
+\SI{12}{\volt} source at J1, an ideal \SI{3.3}{\volt} source at U3's output pads, and a
+\SI{50}{\milli\ampere} current load between U2's VDD and VSS pins. The LDO was modeled as an ideal
+voltage source rather than with \texttt{padne}'s dedicated \texttt{REGULATOR} directive -- the two
+together (\texttt{REGULATOR} + \texttt{CURRENT} on the same net) reliably produced a
+"ground node current is not zero, exactly the specified load current" solver warning that swapping the
+directives' current-direction parameters did not fix; isolating the problem (VOLTAGE+REGULATOR alone,
+no load, solved cleanly) showed the fault is in how \texttt{padne}'s solver handles that specific
+element combination, not in this board's setup -- a real limitation of what is explicitly an
+early-stage tool, not a design error. The substitution means this result shows how much the copper
+itself drops the already-regulated 3.3\,V, not the LDO's own regulation behavior (output impedance,
+current limit), which is a separate question this method does not answer.
+
+\textbf{Result:} Figure~\ref{fig:pdn-dc} -- the 3.3\,V/GND plane shows at most
+\SI{148}{\micro\volt} of drop under the \SI{50}{\milli\ampere} load, confirming the copper pour is
+far from being the bottleneck for this current level.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.85\textwidth]{figures/pdn_dc_voltage.png}
+\caption{DC voltage distribution (\texttt{padne}): yellow/red = \SI{12}{\volt} eFuse input, purple =
+3.3\,V/GND plane under the STM32's \SI{50}{\milli\ampere} load. The mesh triangulation is
+\texttt{padne}'s FEM discretization of the copper pours.}
+\label{fig:pdn-dc}
+\end{figure}
+
+\textbf{AC tooling note:} the AC sweep is planned with KiPI (github.com/drewsum/KiPI -- not the
+similarly-named KiPIDA, which is DC-only). Getting it running exposed a real packaging gap: its
+\texttt{requirements.txt} pins \texttt{triangle>=20230923}, a meshing dependency with no published
+wheel past CPython 3.12 and no source distribution on PyPI, so the install silently stalled on newer
+Python. Worked around by building \texttt{triangle} from its GitHub source directly into KiPI's
+plugin-managed virtual environment.
+
+% ======================================================================
 \section{Known Limitations}
 
 \begin{itemize}
@@ -247,9 +294,11 @@ thermal behavior (R5/Q1 at \SI{12}{\volt}/\SI{15}{\ampere}) was already characte
   (a) compiling cleanly against the STM32F411 HAL, and (b) a host-side unit test feeding it synthetic
   register bytes constructed from the datasheet's own description, \emph{not} by claiming it was
   tested on real hardware -- this board was never built.
-\item PDN (power distribution network) impedance-vs-frequency check of the 3.3\,V rail and its
-  decoupling bank, to confirm the capacitor values chosen by convention actually cover the relevant
-  frequency range rather than just assuming "\SI{100}{\nano\farad} near every pin is enough."
+\item PDN AC impedance-vs-frequency sweep of the 3.3\,V rail and its decoupling bank (DC voltage-drop
+  check already done, Section~\ref{sec:pdn}), to confirm the capacitor values chosen by convention
+  actually cover the relevant frequency range rather than just assuming "\SI{100}{\nano\farad} near
+  every pin is enough." Tooling (KiPI) is installed and loads the board; the probe/sweep setup was not
+  finished this session.
 \item A permanent fix for the crystal's pad 3/4 net assignment being wiped on every schematic re-sync
   (either edit the symbol's own pin-to-pad mapping in a local library copy, or simply stop re-running
   "Update PCB from Schematic" now that the schematic is stable).
