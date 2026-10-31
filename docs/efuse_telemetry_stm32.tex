@@ -265,11 +265,43 @@ Python. Worked around by building \texttt{triangle} from its GitHub source direc
 plugin-managed virtual environment.
 
 % ======================================================================
+\section{Firmware}
+\label{sec:firmware}
+
+An I\textsuperscript{2}C driver for the LTC4215, generated/scaffolded from STM32CubeMX (I2C1 on
+PB6/PB7, USB\_OTG\_FS Device-only with VBUS sensing disabled -- consistent with Section~\ref{sec:i2c}
+and the self-powered design in Section~\ref{sec:pending} -- and USB\_DEVICE configured for CDC/Virtual
+COM Port) and a hand-written register layer (\texttt{Core/Inc/ltc4215.h},
+\texttt{Core/Src/ltc4215.c}).
+
+\textbf{Register map}: taken directly from the datasheet (Tables 2--8), not re-derived: CONTROL (00h),
+ALERT (01h), STATUS (02h, read-only), FAULT (03h, write 0 to clear), SENSE (04h, \SI{151}{\micro\volt}
+LSB), SOURCE (05h, \SI{60.5}{\milli\volt} LSB), ADIN (06h, \SI{4.82}{\milli\volt} LSB -- reads
+$\approx$0 on this board since ADIN is tied to GND, not used). The main loop polls STATUS/FAULT/SENSE/
+SOURCE every \SI{500}{\milli\second} and writes a line (output current via R5, SOURCE voltage, FET/
+power-good/fault flags) out over USB-CDC.
+
+\textbf{Verification, both without any physical board:}
+\begin{itemize}
+\item \textbf{Compiles cleanly against the real HAL.} CMake + \texttt{arm-none-eabi-gcc}, 0
+  errors/warnings: \SI{36020}{byte} FLASH (6.87\% of 512\,KB), \SI{9456}{byte} RAM (7.21\% of 128\,KB).
+\item \textbf{Register-conversion math checked on the host}, not the target: the SENSE/SOURCE/ADIN
+  raw-byte-to-physical-value functions are factored out of the HAL calls specifically so they can run
+  under plain \texttt{gcc} with no STM32 hardware. \texttt{code/test/ltc4215\_regmap\_test.c} feeds
+  synthetic register bytes and checks the result against the datasheet's own LSB values (e.g.\ raw
+  SENSE$=255 \to \SI{38505}{\micro\volt} \to \SI{7701}{\milli\ampere}$ through the \SI{5}{\milli\ohm}
+  R5) -- 11/11 checks pass.
+\end{itemize}
+
+Neither of these is a claim that I\textsuperscript{2}C traffic was ever exchanged with a real LTC4215
+-- this board was never built. They verify that the code is correct against its two specifications (the
+HAL's API and the datasheet's register values), which is the honest extent of what is checkable without
+hardware.
+
+% ======================================================================
 \section{Known Limitations}
 
 \begin{itemize}
-\item \textbf{No firmware written or tested.} The I\textsuperscript{2}C telemetry path (SDA/SCL/ALERT)
-  is wired and DRC-clean, but nothing has read a register from the LTC4215 yet, real or simulated.
 \item \textbf{LTC4215 is not PMBus-compliant.} It has its own proprietary I\textsuperscript{2}C
   register map (datasheet Tables 2/3), not the standardized PMBus command set. This project is
   "digital power monitoring in the spirit of PMBus," not a PMBus device, and is described that way
@@ -289,11 +321,6 @@ thermal behavior (R5/Q1 at \SI{12}{\volt}/\SI{15}{\ampere}) was already characte
 
 \begin{pending}
 \begin{itemize}
-\item Firmware: an I\textsuperscript{2}C driver reading the LTC4215's ADIN/status/fault registers per
-  the datasheet's command table, converting raw ADC counts to real current/voltage. To be verified by
-  (a) compiling cleanly against the STM32F411 HAL, and (b) a host-side unit test feeding it synthetic
-  register bytes constructed from the datasheet's own description, \emph{not} by claiming it was
-  tested on real hardware -- this board was never built.
 \item PDN AC impedance-vs-frequency sweep of the 3.3\,V rail and its decoupling bank (DC voltage-drop
   check already done, Section~\ref{sec:pdn}), to confirm the capacitor values chosen by convention
   actually cover the relevant frequency range rather than just assuming "\SI{100}{\nano\farad} near
@@ -329,7 +356,11 @@ footprint's two-terminal reality, same-net labels silently merging across unrela
 confirmed (not assumed) BOOT1 requirement on the F411 -- are documented in
 Section~\ref{sec:pitfalls} for the next project that touches this MCU family.
 
-Firmware and a PDN impedance check remain open, both scoped honestly in Section~\ref{sec:pending}
-rather than claimed as done.
+A DC PDN check (Section~\ref{sec:pdn}) found the 3.3\,V/GND plane drops at most
+\SI{148}{\micro\volt} under the STM32's load -- the copper is not the bottleneck. The I\textsuperscript{2}C
+driver (Section~\ref{sec:firmware}) compiles cleanly against the real HAL and its register-conversion
+math is checked against the datasheet's own LSB values on the host, 11/11 -- neither claims real
+hardware was involved, since none was built. The AC PDN impedance sweep remains open, scoped honestly
+in Section~\ref{sec:pending} rather than claimed as done.
 
 \end{document}

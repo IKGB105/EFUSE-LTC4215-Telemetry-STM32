@@ -14,9 +14,6 @@ placeholders.
 - **Scope:** schematic + PCB layout only, same convention as every project in this series. Not
   physically built.
 
-> ⚠️ **No firmware yet.** The I²C bus (SDA/SCL/ALERT) is wired and DRC-clean, but nothing has read a
-> register from the LTC4215, real or simulated. See [Pending](#pending).
-
 > ⚠️ **The LTC4215 is not PMBus-compliant.** It has its own proprietary I²C register map, not the
 > standardized PMBus command set — described here as "digital power monitoring in the spirit of
 > PMBus," not as a PMBus device, to avoid overstating the IC.
@@ -59,11 +56,29 @@ correct and corrected where it was not — see the report's pitfalls section for
 - Single-stage **12 V → 3.3 V** LDO (LD1117S33TR) direct from the eFuse's +12 V rail — not the real
   Blackpill's two-stage USB-fed supply, since this board is never USB-powered.
 
+## Firmware
+
+I²C driver for the LTC4215 (`code/EFUSE_TELEMETRY/Core/{Inc,Src}/ltc4215.c,h`), on a STM32CubeMX
+skeleton (I2C1 on PB6/PB7, USB\_OTG\_FS device-only with VBUS sensing disabled, USB\_DEVICE as
+CDC/Virtual COM Port). Register map (CONTROL/ALERT/STATUS/FAULT/SENSE/SOURCE/ADIN, 00h-06h) and LSB
+values taken straight from the datasheet's Tables 2-8, not re-derived. Main loop polls every 500 ms
+and streams output current/voltage/fault flags over USB-CDC.
+
+**Verified without any physical board, two ways:**
+- Compiles clean against the real HAL — CMake + `arm-none-eabi-gcc`, 0 errors/warnings, 36020 B FLASH
+  (6.87%), 9456 B RAM (7.21%).
+- The register-to-physical-value math is checked on the **host** (plain `gcc`, no STM32 hardware) in
+  [`code/test/ltc4215_regmap_test.c`](code/test/ltc4215_regmap_test.c) against synthetic bytes derived
+  from the datasheet's LSB values — 11/11 checks pass.
+
+Neither claims real I²C traffic with a physical LTC4215 — this board was never built.
+
 ## Repository structure
 
 ```
 docs/         LaTeX report (efuse_telemetry_stm32.tex) + datasheet + WeAct reference schematic
 kicad/        KiCad project — schematic + PCB, ERC/DRC clean
+code/         STM32CubeMX project (CMake) + LTC4215 driver + host-side unit test
 ```
 
 ## Document
@@ -103,9 +118,6 @@ loading the board, but the probe/sweep setup wasn't finished this session.
 
 ## Pending
 
-- Firmware: an I²C driver reading the LTC4215's ADIN/status/fault registers, verified by compiling
-  cleanly against the STM32F411 HAL and a host-side unit test against synthetic register bytes — not
-  by claiming it was tested on hardware that was never built.
 - The PDN AC sweep above.
 - A permanent fix for the crystal's pad 3/4 net assignment being wiped on every "Update PCB from
   Schematic" re-sync (PCB-only pad overrides don't survive a re-sync from a schematic that never knew

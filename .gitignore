@@ -43,3 +43,8 @@ Thumbs.db
 __pycache__/
 *.pyc
 *.mph*
+
+# Firmware build output (CMake) and host-side test binary
+code/EFUSE_TELEMETRY/build/
+code/test/ltc4215_regmap_test
+code/EFUSE_TELEMETRY/.mxproject
