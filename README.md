@@ -86,6 +86,10 @@ visual grouping is clearer.
 
 ## PDN analysis
 
+<img src="docs/figures/pdn_dc_voltage.png" width="500" alt="DC PDN voltage distribution"><br>
+<sub>padne — DC voltage distribution: 12V eFuse input (yellow/red) and the 3.3V/GND plane under the
+STM32's 50mA load (purple), at most 148µV of drop.</sub>
+
 DC voltage-drop check done with [`padne`](https://github.com/atx/padne) (built from source — needs
 `boost` dev headers for its CGAL dependency): under the STM32's estimated 50 mA load, the 3.3 V/GND
 plane shows at most **148 µV** of drop — the copper is far from the bottleneck at this current level.
