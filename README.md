@@ -116,13 +116,6 @@ AC impedance-vs-frequency sweep (the actual question for a digital decoupling ba
 to capacitors entirely) is planned with [KiPI](https://github.com/drewsum/KiPI) — installed and
 loading the board, but the probe/sweep setup wasn't finished this session.
 
-## Pending
-
-- The PDN AC sweep above.
-- A permanent fix for the crystal's pad 3/4 net assignment being wiped on every "Update PCB from
-  Schematic" re-sync (PCB-only pad overrides don't survive a re-sync from a schematic that never knew
-  about those pads).
-
 ## License
 
 MIT — see [LICENSE](LICENSE).
